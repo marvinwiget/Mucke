@@ -1,0 +1,28 @@
+config {
+    bpm: 110
+    meter: 4/4
+    volume: 1.0
+
+    init bass with (
+        sample: "samples/bass.wav",
+        pattern: [C2, rest, G2, rest],
+        root_note: C2,
+        volume: 0.9,
+        
+    )
+
+    init lead with (
+        sample: "samples/lead.wav",
+        pattern: [E3, F3, G3, rest],
+        root_note: E3
+    )
+}
+
+main {
+    bass.play()
+    lead.play()
+    lead.volume: 0.5
+    bass.loop(5)
+    bass.pitch: 100
+    lead.loop(3)
+}
