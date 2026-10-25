@@ -1,4 +1,4 @@
-package io.github.marvinwiget.mucke;
+package io.github.marvinwiget.mucke.interpreter;
 
 class Token {
     final TokenType type;
