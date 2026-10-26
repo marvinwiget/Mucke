@@ -15,6 +15,7 @@ class Scanner {
     private int line = 1;
 
     private static final Map<String, TokenType> keywords;
+    private final List<Diagnostic> diagnostics;
 
     static {
         keywords = new HashMap<>();
@@ -28,7 +29,12 @@ class Scanner {
     }
 
     Scanner(String source) {
+        this(source, new ArrayList<>());
+    }
+
+    Scanner(String source, List<Diagnostic> diagnostics) {
         this.source = source;
+        this.diagnostics = diagnostics;
     }
 
     List<Token> scanTokens() {
@@ -74,7 +80,7 @@ class Scanner {
                 } else if (isAlpha(c)) {
                     identifier();
                 } else {
-                    Mucke.error(line, "Unexpected character.");
+                    error(line, "Unexpected character.");
                 }
                 break;
         }
@@ -89,7 +95,7 @@ class Scanner {
             return;
         }
         if (text.contains("#")) {
-            Mucke.error(line, "Invalid note: " + text);
+            error(line, "Invalid note: " + text);
             return;
         }
 
@@ -117,7 +123,7 @@ class Scanner {
         }
 
         if (isAtEnd()) {
-            Mucke.error(line, "Unterminated string.");
+            error(line, "Unterminated string.");
             return;
         }
 
@@ -127,6 +133,7 @@ class Scanner {
         addToken(STRING, value);
     }
 
+    /*
     private boolean match(char expected) {
         if (isAtEnd()) return false;
         if (source.charAt(current) != expected) return false;
@@ -134,6 +141,7 @@ class Scanner {
         current++;
         return true;
     }
+    */
 
     private char peek() {
         if (isAtEnd()) return '\0';
@@ -175,4 +183,9 @@ class Scanner {
         String text = source.substring(start, current);
         tokens.add(new Token(type, text, literal, line));
     }
+
+    private void error(int line, String message) {
+        diagnostics.add(new Diagnostic(line, message));
 }
+}
+
