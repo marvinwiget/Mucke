@@ -11,17 +11,21 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.flowless.VirtualizedScrollPane;
 
 public final class App extends Application {
     private final Interpreter interpreter = new Interpreter();
 
     private ExecutorService worker;
     private PauseTransition debounce;
-    private TextArea editor;
+    private CodeArea editor;
     private Label status;
     private long revision;
 
@@ -32,9 +36,18 @@ public final class App extends Application {
             thread.setDaemon(true);
             return thread;
         });
+        Font font = Font.font("Monospaced Regular", 20);
 
-        editor = new TextArea("config {\n}\n\nmain {\n}\n");
+        editor = new CodeArea();
+        editor.replaceText("config {\n}\n\nmain {\n}\n");
+        editor.setParagraphGraphicFactory(LineNumberFactory.get(editor));
+        //editor.setFont(font);  // use css method?
+
+        editor.setWrapText(false);  
+
         status = new Label("Checking...");
+        status.setFont(font);
+      
         status.setWrapText(true);
 
         debounce = new PauseTransition(Duration.millis(250));
@@ -47,7 +60,7 @@ public final class App extends Application {
         });
 
         BorderPane root = new BorderPane();
-        root.setCenter(editor);
+        root.setCenter(new VirtualizedScrollPane<>(editor));
         root.setBottom(status);
         BorderPane.setMargin(status, new Insets(8));
 
