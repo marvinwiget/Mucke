@@ -1,8 +1,14 @@
 .gradle/
 build/
 out/
+target/
+.mvn/repository/
+.mvn/wrapper/dists/
 *.class
 .DS_Store
 .idea/
 *.iml
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+.javafx/
