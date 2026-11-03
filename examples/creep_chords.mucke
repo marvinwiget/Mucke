@@ -1,0 +1,35 @@
+config {
+    bpm: 46
+    meter: 4/4
+
+    init chords with (
+        synth: 0,
+        pattern: [
+            [G3, B3, D4], [G3, B3, D4], [G3, B3, D4], [G3, B3, D4],
+            [B3, D#4, F#4], [B3, D#4, F#4], [B3, D#4, F#4], [B3, D#4, F#4],
+            [C4, E4, G4], [C4, E4, G4], [C4, E4, G4], [C4, E4, G4],
+            [C4, Eb4, G4], [C4, Eb4, G4], [C4, Eb4, G4], [C4, Eb4, G4]
+        ]
+    )
+
+    init bass with (
+        synth: 33,
+        pattern: [
+            G2, rest, G2, rest,
+            B2, rest, B2, rest,
+            C3, rest, C3, rest,
+            C3, rest, C3, rest
+        ]
+    )
+
+    init kick with (
+        sample: "../samples/drums/kick/bd_808.wav",
+        pattern: [hit, rest, hit, rest]
+    )
+}
+
+main {
+    $chords
+    $bass
+    $kick
+}

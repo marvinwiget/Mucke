@@ -1,0 +1,29 @@
+config {
+    bpm: 112
+    meter: 4/4
+
+    init melody with (
+        synth: 0,
+        pattern: [
+            E4, E4, F4, G4, G4, F4, E4, D4,
+            C4, C4, D4, E4, E4, D4, D4, rest,
+            E4, E4, F4, G4, G4, F4, E4, D4,
+            C4, C4, D4, E4, D4, C4, C4, rest
+        ]
+    )
+
+    init bass with (
+        synth: 32,
+        pattern: [C2, rest, G2, rest]
+    )
+
+    init snare with (
+        sample: "../samples/drums/snare/drum_snare_soft.wav",
+        pattern: [rest, hit, rest, hit]
+    )
+}
+
+main {
+    $melody
+    $bass
+}
