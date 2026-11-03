@@ -13,17 +13,13 @@ class Parser {
 
   private final List<Diagnostic> diagnostics;
 
-  Parser(List<Token> tokens) {
-      this(tokens, new ArrayList<>());
-  }
-
   Parser(List<Token> tokens, List<Diagnostic> diagnostics) {
       this.tokens = tokens;
       this.diagnostics = diagnostics;
   }
 
   // program → "config" "{" configEntry* "}"
-  //           "main"   "{" statement* "}" EOF
+  //           "main"   "{" ("$" IDENTIFIER NEWLINE)* "}" EOF
   Program parse() {
     try {
       skipNewlines();
@@ -37,7 +33,7 @@ class Parser {
 
       consume(MAIN, "Expect 'main'.");
       consume(LEFT_BRACE, "Expect '{' after 'main'.");
-      List<Stmt> main = mainBlock();
+      List<Token> main = mainBlock();
       consume(RIGHT_BRACE, "Expect '}' after main block.");
 
       skipNewlines();
@@ -47,19 +43,6 @@ class Parser {
       }
 
       return new Program(config, main);
-    } catch (ParseError error) {
-      return null;
-    }
-  }
-
-  // A prompt line is one statement from the main block.
-  Stmt parsePromptStatement() {
-    try {
-      skipNewlines();
-      Stmt result = statement();
-      skipNewlines();
-      if (!isAtEnd()) throw error(peek(), "Expect end of input.");
-      return result;
     } catch (ParseError error) {
       return null;
     }
@@ -118,62 +101,23 @@ class Parser {
     return new ConfigEntry.Instrument(name, fields);
   }
 
-  // main block → statement*
-  private List<Stmt> mainBlock() {
-    List<Stmt> statements = new ArrayList<>();
+  // main block → ("$" IDENTIFIER NEWLINE)*
+  private List<Token> mainBlock() {
+    List<Token> instruments = new ArrayList<>();
     skipNewlines();
 
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
-      statements.add(statement());
+      consume(DOLLAR, "Expect '$' before an instrument name.");
+      instruments.add(consume(IDENTIFIER, "Expect instrument name after '$'."));
       endOfLine();
     }
 
-    return statements;
-  }
-
-  // statement → IDENTIFIER ":" value
-  //           | IDENTIFIER "." IDENTIFIER ":" value
-  //           | IDENTIFIER "." IDENTIFIER "(" arguments? ")"
-  private Stmt statement() {
-    Token name = consume(IDENTIFIER, "Expect a name.");
-
-    if (match(COLON)) {
-      return new Stmt.Assign(name, value());
-    }
-
-    consume(DOT, "Expect '.' or ':' after name.");
-    Token member = consume(IDENTIFIER, "Expect property or method name.");
-
-    if (match(COLON)) {
-      return new Stmt.Set(name, member, value());
-    }
-
-    consume(LEFT_PAREN, "Expect ':' or '(' after member name.");
-    List<Expr> arguments = new ArrayList<>();
-    skipNewlines();
-
-    if (!check(RIGHT_PAREN)) {
-      arguments.add(value());
-      skipNewlines();
-
-      while (match(COMMA)) {
-        skipNewlines();
-        if (check(RIGHT_PAREN)) break; // Optional trailing comma.
-        arguments.add(value());
-        skipNewlines();
-      }
-    }
-
-    consume(RIGHT_PAREN, "Expect ')' after arguments.");
-    return new Stmt.Call(name, member, arguments);
+    return instruments;
   }
 
   // value → NUMBER ("/" NUMBER)?
-  //       | STRING | NOTE | "rest" | "true" | "false" | list
+  //       | STRING | NOTE | "hit" | "rest" | list
   private Expr value() {
-    if (match(TRUE)) return new Expr.Literal(true);
-    if (match(FALSE)) return new Expr.Literal(false);
-
     if (match(NUMBER)) {
       Token numerator = previous();
 
@@ -191,6 +135,10 @@ class Parser {
 
     if (match(NOTE)) {
       return new Expr.Note(previous());
+    }
+
+    if (match(HIT)) {
+      return new Expr.Hit(previous());
     }
 
     if (match(REST)) {
@@ -226,7 +174,7 @@ class Parser {
     return new Expr.ListLiteral(elements);
   }
 
-  // A newline separates entries in config and statements in main.
+  // A newline separates entries in config and activations in main.
   private void endOfLine() {
     if (check(RIGHT_BRACE) || isAtEnd()) return;
 

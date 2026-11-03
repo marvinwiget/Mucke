@@ -157,9 +157,16 @@ public final class App extends Application {
 
                 LivePlayer.PreparedPlan prepared = player.prepare(result.getPlan());
                 if (submitted != revision.get()) return;
-                player.submit(prepared);
-                showStatus(submitted, result.getPlan().tracks.isEmpty()
-                    ? "Valid source (silent)" : "Playing");
+                Platform.runLater(() -> {
+                    if (submitted != revision.get()) return;
+                    try {
+                        player.submit(prepared);
+                        status.setText(result.getPlan().tracks.isEmpty()
+                            ? "Valid source (silent)" : "Playing");
+                    } catch (RuntimeException error) {
+                        status.setText("Cannot play: " + error.getMessage());
+                    }
+                });
             } catch (Exception error) {
                 showStatus(submitted, "Cannot play: " + error.getMessage());
             }

@@ -29,6 +29,14 @@ abstract class Expr {
         final Token note;
     }
 
+    static class Hit extends Expr {
+        Hit(Token keyword) {
+            this.keyword = keyword;
+        }
+
+        final Token keyword;
+    }
+
     static class Rest extends Expr {
         Rest(Token keyword) {
             this.keyword = keyword;

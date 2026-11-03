@@ -23,13 +23,8 @@ class Scanner {
         keywords.put("main", MAIN);
         keywords.put("init", INIT);
         keywords.put("with", WITH);
+        keywords.put("hit", HIT);
         keywords.put("rest", REST);
-        keywords.put("true", TRUE);
-        keywords.put("false", FALSE);
-    }
-
-    Scanner(String source) {
-        this(source, new ArrayList<>());
     }
 
     Scanner(String source, List<Diagnostic> diagnostics) {
@@ -57,9 +52,13 @@ class Scanner {
             case '[': addToken(LEFT_BRACKET); break;
             case ']': addToken(RIGHT_BRACKET); break;
             case ',': addToken(COMMA); break;
-            case '.': addToken(DOT); break;
             case ':': addToken(COLON); break;
             case '/': addToken(SLASH); break;
+            case '$': addToken(DOLLAR); break;
+            case '-':
+                if (isDigit(peek())) number();
+                else error(line, "Expect a number after '-'.");
+                break;
 
             case ' ':
             case '\r':
@@ -88,17 +87,16 @@ class Scanner {
 
     private void identifier() {
         while (isAlphaNumeric(peek()) || peek() == '#') advance();
-        
+
         String text = source.substring(start, current);
         if (text.matches("[A-G](?:#|b)?[0-9]+")) {
-            addToken(NOTE, text);
+            addToken(NOTE);
             return;
         }
         if (text.contains("#")) {
             error(line, "Invalid note: " + text);
             return;
         }
-
         TokenType type = keywords.getOrDefault(text, IDENTIFIER);
         addToken(type);
     }
@@ -132,16 +130,6 @@ class Scanner {
         String value = source.substring(start + 1, current - 1);
         addToken(STRING, value);
     }
-
-    /*
-    private boolean match(char expected) {
-        if (isAtEnd()) return false;
-        if (source.charAt(current) != expected) return false;
-
-        current++;
-        return true;
-    }
-    */
 
     private char peek() {
         if (isAtEnd()) return '\0';
@@ -186,6 +174,6 @@ class Scanner {
 
     private void error(int line, String message) {
         diagnostics.add(new Diagnostic(line, message));
-}
+    }
 }
 

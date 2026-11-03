@@ -1,175 +1,109 @@
 package io.github.marvinwiget.mucke.sound;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.SourceDataLine;
-import javax.sound.sampled.UnsupportedAudioFileException;
+import javax.sound.midi.MidiUnavailableException;
 
 import io.github.marvinwiget.mucke.music.PlaybackPlan;
+import io.github.marvinwiget.mucke.music.PatternStep;
 import io.github.marvinwiget.mucke.music.TrackPlan;
+import javafx.animation.PauseTransition;
+import javafx.scene.media.AudioClip;
+import javafx.util.Duration;
 
 public final class LivePlayer implements AutoCloseable {
-    private static final int BLOCK_FRAMES = 256;
-    private static final AudioFormat FORMAT =
-        new AudioFormat(Transport.SAMPLE_RATE, 16, 2, true, false);
-
     public static final class PreparedPlan {
         final PlaybackPlan plan;
-        final List<PreparedTrack> tracks;
+        final Map<String, AudioClip> clips;
 
-        PreparedPlan(PlaybackPlan plan, List<PreparedTrack> tracks) {
+        PreparedPlan(PlaybackPlan plan, Map<String, AudioClip> clips) {
             this.plan = plan;
-            this.tracks = tracks;
+            this.clips = clips;
         }
     }
 
-    static final class PreparedTrack {
-        final TrackPlan plan;
-        final float[] sample;
+    private final Map<Path, AudioClip> samples = new HashMap<>();
+    private final SynthPlayer synth = new SynthPlayer();
+    private final BeatSequencer sequencer = new BeatSequencer();
+    private final PauseTransition clock = new PauseTransition();
+    private PreparedPlan current;
+    private PreparedPlan pending;
+    private long beat;
+    private boolean running;
+    private boolean closed;
 
-        PreparedTrack(TrackPlan plan, float[] sample) {
-            this.plan = plan;
-            this.sample = sample;
-        }
+    public LivePlayer() {
+        clock.setOnFinished(event -> tick());
     }
 
-    private static final class Voice {
-        final float[] sample;
-        final double rate;
-        final double gain;
-        double position;
-
-        Voice(float[] sample, double rate, double gain) {
-            this.sample = sample;
-            this.rate = rate;
-            this.gain = gain;
-        }
-
-        boolean done() {
-            return position >= sample.length;
-        }
-
-        double next() {
-            int first = (int) position;
-            int second = Math.min(first + 1, sample.length - 1);
-            double fraction = position - first;
-            double value = sample[first] * (1 - fraction)
-                + sample[second] * fraction;
-            position += rate;
-            return value * gain;
-        }
-    }
-
-    private final SampleLibrary samples = new SampleLibrary();
-    private final AtomicReference<PreparedPlan> pending = new AtomicReference<>();
-    private volatile boolean running;
-    private SourceDataLine line;
-    private Thread audioThread;
-
-    // Call from the app's worker thread, never the JavaFX thread.
+    // The app's single worker calls prepare(), so sample loading stays off the UI thread.
     public PreparedPlan prepare(PlaybackPlan plan)
-            throws IOException, UnsupportedAudioFileException {
-        List<PreparedTrack> tracks = new ArrayList<>();
+            throws IOException, MidiUnavailableException {
+        Map<String, AudioClip> clips = new HashMap<>();
+        int synthTracks = 0;
         for (TrackPlan track : plan.tracks) {
-            tracks.add(new PreparedTrack(track, samples.load(track.sample)));
+            if (track.isSynth()) {
+                synthTracks++;
+                continue;
+            }
+            if (!Files.isRegularFile(track.sample)) {
+                throw new IOException("Sample not found: " + track.sample);
+            }
+            clips.put(track.name, samples.computeIfAbsent(track.sample,
+                path -> new AudioClip(path.toUri().toString())));
         }
-        return new PreparedPlan(plan, List.copyOf(tracks));
+        synth.prepare(synthTracks);
+        return new PreparedPlan(plan, clips);
     }
 
-    public synchronized void submit(PreparedPlan plan)
-            throws LineUnavailableException {
-        pending.set(plan);
-        if (running || plan.tracks.isEmpty()) return;
-
-        line = AudioSystem.getSourceDataLine(FORMAT);
-        line.open(FORMAT, BLOCK_FRAMES * FORMAT.getFrameSize() * 4);
-        line.start();
-        running = true;
-        audioThread = new Thread(this::render, "mucke-audio");
-        audioThread.setDaemon(true);
-        audioThread.start();
+    // Called on the JavaFX thread. The latest valid plan takes effect on the next beat.
+    public void submit(PreparedPlan plan) {
+        if (closed) return;
+        pending = plan;
+        if (!running) {
+            running = true;
+            tick();
+        }
     }
 
-    private void render() {
-        Transport clock = new Transport(120);
-        BeatSequencer sequencer = new BeatSequencer();
-        List<Voice> voices = new ArrayList<>();
-        byte[] buffer = new byte[BLOCK_FRAMES * FORMAT.getFrameSize()];
-        long frame = 0;
-        long nextBeatToSchedule = 0;
-        long switchFrame = Long.MAX_VALUE;
-        long switchBeat = 0;
-        boolean hasPlan = false;
-        PreparedPlan staged = null;
+    private void tick() {
+        if (pending != null) {
+            current = pending;
+            pending = null;
+            sequencer.update(current.plan, beat);
+        }
 
-        while (running) {
-            PreparedPlan newest = pending.getAndSet(null);
-            if (newest != null) {
-                staged = newest;
-                switchBeat = hasPlan ? nextBeatToSchedule : 0;
-                switchFrame = hasPlan ? clock.frameAtBeat(switchBeat) : frame;
-            }
-
-            for (int i = 0; i < BLOCK_FRAMES; i++, frame++) {
-                if (staged != null && frame >= switchFrame) {
-                    clock.changeTempoAt(frame, switchBeat, staged.plan.bpm);
-                    sequencer.update(staged, switchBeat);
-                    staged = null;
-                    hasPlan = true;
-                }
-
-                while (hasPlan && frame >= clock.frameAtBeat(nextBeatToSchedule)) {
-                    for (BeatSequencer.Trigger trigger :
-                            sequencer.atBeat(nextBeatToSchedule)) {
-                        TrackPlan track = trigger.track.plan;
-                        double rate = track.pitch * Math.pow(2,
-                            (trigger.note.midiNote - track.rootNote) / 12.0);
-                        voices.add(new Voice(trigger.track.sample, rate, track.gain));
-                    }
-                    nextBeatToSchedule++;
-                }
-
-                double mixed = 0;
-                for (int voice = voices.size() - 1; voice >= 0; voice--) {
-                    Voice current = voices.get(voice);
-                    if (current.done()) {
-                        voices.remove(voice);
-                    } else {
-                        mixed += current.next();
-                    }
-                }
-
-                int pcm = (int) Math.round(Math.max(-1, Math.min(1, mixed)) * 32767);
-                int offset = i * 4;
-                buffer[offset] = (byte) pcm;
-                buffer[offset + 1] = (byte) (pcm >> 8);
-                buffer[offset + 2] = (byte) pcm;
-                buffer[offset + 3] = (byte) (pcm >> 8);
-            }
-
-            int written = 0;
-            while (running && written < buffer.length) {
-                int count = line.write(buffer, written, buffer.length - written);
-                if (count <= 0) break;
-                written += count;
+        Map<String, PatternStep> steps = sequencer.atBeat();
+        synth.endBeat();
+        int channel = 0;
+        for (TrackPlan track : current.plan.tracks) {
+            PatternStep step = steps.get(track.name);
+            if (track.isSynth()) {
+                synth.play(channel++, track.synthProgram, track.transpose, step.notes);
+            } else if (step.hit) {
+                current.clips.get(track.name).play();
             }
         }
+        beat++;
+        clock.setDuration(Duration.millis(
+            60_000.0 * 4 / (current.plan.bpm * current.plan.meterBottom)));
+        clock.playFromStart();
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
+        closed = true;
+        clock.stop();
         running = false;
-        pending.set(null);
-        if (line != null) {
-            line.stop();
-            line.flush();
-            line.close();
+        if (current != null) {
+            current.clips.values().forEach(AudioClip::stop);
         }
+        synth.close();
+        current = null;
+        pending = null;
     }
 }

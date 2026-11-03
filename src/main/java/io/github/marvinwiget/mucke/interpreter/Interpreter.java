@@ -25,8 +25,8 @@ public final class Interpreter {
 
         try {
             return new CompileResult(
-                new ScoreCompiler().compile(program, baseDir), diagnostics);
-        } catch (ScoreCompiler.CompileError error) {
+                new PlanCompiler().compile(program, baseDir), diagnostics);
+        } catch (PlanCompiler.CompileError error) {
             diagnostics.add(new Diagnostic(error.line, error.getMessage()));
             return new CompileResult(null, diagnostics);
         }

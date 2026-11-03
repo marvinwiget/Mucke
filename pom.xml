@@ -21,6 +21,11 @@
             <version>${javafx.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.fxmisc.richtext</groupId>
             <artifactId>richtextfx</artifactId>
             <version>0.11.7</version>
@@ -37,13 +42,6 @@
                     <excludes>
                         <exclude>**/interpreter/old/**</exclude>
                     </excludes>
-                    <!-- These tests target the archived interpreter and cannot compile against the active code. -->
-                    <testExcludes>
-                        <testExclude>**/LiveSessionTest.java</testExclude>
-                        <testExclude>**/ScoreCompilerTest.java</testExclude>
-                        <testExclude>**/SourceWatcherTest.java</testExclude>
-                        <testExclude>**/SampleAudioEngineTest.java</testExclude>
-                    </testExcludes>
                 </configuration>
             </plugin>
             <plugin>

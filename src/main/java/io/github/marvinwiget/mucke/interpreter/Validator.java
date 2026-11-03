@@ -1,28 +1,11 @@
 package io.github.marvinwiget.mucke.interpreter;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// import io.github.marvinwiget.mucke.interpreter.ConfigEntry.Instrument;
-// import io.github.marvinwiget.mucke.interpreter.ConfigEntry.Setting;
-// import io.github.marvinwiget.mucke.interpreter.Expr.ListLiteral;
-// import io.github.marvinwiget.mucke.interpreter.Expr.Literal;
-// import io.github.marvinwiget.mucke.interpreter.Expr.Note;
-// import io.github.marvinwiget.mucke.interpreter.Expr.Ratio;
-// import io.github.marvinwiget.mucke.interpreter.Expr.Rest;
-// import io.github.marvinwiget.mucke.interpreter.Stmt.Assign;
-// import io.github.marvinwiget.mucke.interpreter.Stmt.Call;
-
 class Validator {
-    private final Set<String> instruments = new HashSet<>();
-    private boolean valid = true;
     private final List<Diagnostic> diagnostics;
-
-    Validator() {
-        this(new ArrayList<>());
-    }
 
     Validator(List<Diagnostic> diagnostics) {
         this.diagnostics = diagnostics;
@@ -30,19 +13,17 @@ class Validator {
 
     boolean validate(Program program) {
         Set<String> settings = new HashSet<>();
+        Set<String> instruments = new HashSet<>();
+        int errorsBefore = diagnostics.size();
 
         for (ConfigEntry entry : program.config) {
-            if (entry instanceof ConfigEntry.Setting) {
-                ConfigEntry.Setting setting = (ConfigEntry.Setting) entry;
+            if (entry instanceof ConfigEntry.Setting setting) {
                 if (!settings.add(setting.name.lexeme)) {
                     error(setting.name, "Duplicate setting '" + setting.name.lexeme + "'.");
                 }
                 validateSetting(setting.name, setting.value);
             } else {
                 ConfigEntry.Instrument instrument = (ConfigEntry.Instrument) entry;
-                if (instrument.name.lexeme.equals("all")) {
-                    error(instrument.name, "'all' is reserved for group calls.");
-                }
                 if (!instruments.add(instrument.name.lexeme)) {
                     error(instrument.name, "Duplicate instrument '" + instrument.name.lexeme + "'.");
                 }
@@ -50,188 +31,125 @@ class Validator {
             }
         }
 
-        for (Stmt statement : program.main) {
-            if (statement instanceof Stmt.Assign) {
-                Stmt.Assign assignment = (Stmt.Assign) statement;
-                validateSetting(assignment.name, assignment.value);
-            } else if (statement instanceof Stmt.Set) {
-                Stmt.Set set = (Stmt.Set) statement;
-                requireInstrument(set.object);
-                validateField(set.property, set.value);
-            } else {
-                validateCall((Stmt.Call) statement);
+        Set<String> active = new HashSet<>();
+        for (Token name : program.main) {
+            if (!instruments.contains(name.lexeme)) {
+                error(name, "Unknown instrument '" + name.lexeme + "'.");
+            } else if (!active.add(name.lexeme)) {
+                error(name, "Instrument '" + name.lexeme + "' is already active.");
             }
         }
 
-        return valid;
+        return diagnostics.size() == errorsBefore;
     }
 
     private void validateInstrument(ConfigEntry.Instrument instrument) {
         Set<String> fields = new HashSet<>();
-
+        Field pattern = null;
         for (Field field : instrument.fields) {
             if (!fields.add(field.name.lexeme)) {
                 error(field.name, "Duplicate field '" + field.name.lexeme + "'.");
             }
-            validateField(field.name, field.value);
+            switch (field.name.lexeme) {
+                case "sample" -> {
+                    if (!(literal(field.value) instanceof String path) || path.isBlank()) {
+                        error(field.name, "Sample must be a non-empty file path string.");
+                    }
+                }
+                case "synth" -> {
+                    Double program = number(field.value);
+                    if (!wholeNumber(program, 0, 127)) {
+                        error(field.name, "Synth program must be a whole number from 0 to 127.");
+                    }
+                }
+                case "transpose" -> {
+                    Double semitones = number(field.value);
+                    if (!wholeNumber(semitones, -127, 127)) {
+                        error(field.name, "Transpose must be a whole number of semitones.");
+                    }
+                }
+                case "pattern" -> pattern = field;
+                default -> error(field.name,
+                    "Unknown instrument field '" + field.name.lexeme + "'.");
+            }
         }
-
-        if (!fields.contains("sample")) {
-            error(instrument.name, "Instrument requires a sample.");
+        boolean sample = fields.contains("sample");
+        boolean synth = fields.contains("synth");
+        if (sample == synth) {
+            error(instrument.name, "Instrument requires exactly one of sample or synth.");
         }
-        if (!fields.contains("pattern")) {
+        if (fields.contains("transpose") && !synth) {
+            error(instrument.name, "Only synth instruments can use transpose.");
+        }
+        if (pattern == null) {
             error(instrument.name, "Instrument requires a pattern.");
+        } else if (sample != synth) {
+            validatePattern(pattern.name, pattern.value, synth);
         }
     }
 
     private void validateSetting(Token name, Expr value) {
         switch (name.lexeme) {
-            case "bpm":
-                requirePositiveNumber(name, value);
-                break;
-            case "meter":
-                requireMeter(name, value);
-                break;
-            case "volume":
-                requireVolume(name, value);
-                break;
-            default:
-                error(name, "Unknown setting '" + name.lexeme + "'.");
-        }
-    }
-
-    private void validateField(Token name, Expr value) {
-        switch (name.lexeme) {
-            case "sample":
-                Object sample = literal(value);
-                if (!(sample instanceof String) || ((String) sample).isEmpty()) {
-                    error(name, "Sample must be a non-empty file path string.");
+            case "bpm" -> {
+                Double bpm = number(value);
+                if (bpm == null || !Double.isFinite(bpm) || bpm < 1 || bpm > 1000) {
+                    error(name, "BPM must be between 1 and 1000.");
                 }
-                break;
-            case "pattern":
-                requirePattern(name, value);
-                break;
-            case "root_note":
-                if (!(value instanceof Expr.Note)) {
-                    error(name, "Root note must be a note, such as C2.");
-                }
-                break;
-            case "volume":
-                requireVolume(name, value);
-                break;
-            case "pitch":
-                requirePositiveNumber(name, value);
-                break;
-            case "reverb":
-                if (!(literal(value) instanceof Boolean)) {
-                    error(name, "Reverb must be true or false.");
-                }
-                break;
-            default:
-                error(name, "Unknown instrument field '" + name.lexeme + "'.");
-        }
-    }
-
-    private void validateCall(Stmt.Call call) {
-        if (call.object.lexeme.equals("all")) {
-            if (instruments.isEmpty()) {
-                error(call.object, "'all' requires at least one instrument.");
             }
-        } else {
-            requireInstrument(call.object);
-        }
-
-        switch (call.method.lexeme) {
-            case "play":
-            case "stop":
-                if (!call.arguments.isEmpty()) {
-                    error(call.method, call.method.lexeme + "() takes no arguments.");
+            case "meter" -> {
+                if (!(value instanceof Expr.Ratio ratio)
+                        || !positiveWholeNumber(ratio.numerator)
+                        || !positiveWholeNumber(ratio.denominator)) {
+                    error(name, "Meter must be a ratio such as 4/4.");
                 }
-                break;
-            case "loop":
-                if (call.arguments.size() > 1
-                        || (call.arguments.size() == 1
-                        && !isPositiveWholeNumber(call.arguments.get(0)))) {
-                    error(call.method, "loop() takes one positive whole-number count or no arguments.");
-                }
-                break;
-            default:
-                error(call.method, "Unknown method '" + call.method.lexeme + "'.");
+            }
+            default -> error(name, "Unknown setting '" + name.lexeme + "'.");
         }
     }
 
-    private void requireInstrument(Token name) {
-        if (!instruments.contains(name.lexeme)) {
-            error(name, "Unknown instrument '" + name.lexeme + "'.");
-        }
-    }
-
-    private void requirePattern(Token name, Expr value) {
-        if (!(value instanceof Expr.ListLiteral)) {
-            error(name, "Pattern must be a list of notes and rests.");
+    private void validatePattern(Token name, Expr value, boolean synth) {
+        if (!(value instanceof Expr.ListLiteral list) || list.elements.isEmpty()) {
+            error(name, "Pattern must be a non-empty list.");
             return;
-        }
-
-        Expr.ListLiteral list = (Expr.ListLiteral) value;
-        if (list.elements.isEmpty()) {
-            error(name, "Pattern cannot be empty.");
         }
         for (Expr element : list.elements) {
-            if (!(element instanceof Expr.Note) && !(element instanceof Expr.Rest)) {
-                error(name, "Pattern can contain only notes and rests.");
-                break;
+            if (synth) {
+                if (element instanceof Expr.Rest || element instanceof Expr.Note) continue;
+                if (element instanceof Expr.ListLiteral chord && !chord.elements.isEmpty()
+                        && chord.elements.stream().allMatch(note -> note instanceof Expr.Note)) {
+                    continue;
+                }
+                error(name, "Synth pattern steps must be notes, chords, or rest.");
+                return;
+            } else if (!(element instanceof Expr.Hit) && !(element instanceof Expr.Rest)) {
+                error(name, "Sample pattern steps must be hit or rest.");
+                return;
             }
         }
     }
 
-    private void requireMeter(Token name, Expr value) {
-        if (!(value instanceof Expr.Ratio)) {
-            error(name, "Meter must be a ratio such as 4/4.");
-            return;
-        }
-
-        Expr.Ratio ratio = (Expr.Ratio) value;
-        if (!isPositiveWholeNumber((Double) ratio.numerator.literal)
-                || !isPositiveWholeNumber((Double) ratio.denominator.literal)) {
-            error(name, "Meter must contain positive whole numbers.");
-        }
+    private static boolean wholeNumber(Double value, int minimum, int maximum) {
+        return value != null && Double.isFinite(value)
+            && value >= minimum && value <= maximum
+            && value == Math.floor(value);
     }
 
-    private void requireVolume(Token name, Expr value) {
-        Double number = number(value);
-        if (number == null || !Double.isFinite(number)
-                || number < 0 || number > 1) {
-            error(name, "Volume must be between 0 and 1.");
-        }
+    private static Object literal(Expr value) {
+        return value instanceof Expr.Literal literal ? literal.value : null;
     }
 
-    private void requirePositiveNumber(Token name, Expr value) {
-        Double number = number(value);
-        if (number == null || !Double.isFinite(number) || number <= 0) {
-            error(name, "Value must be a positive number.");
-        }
+    private static Double number(Expr value) {
+        Object valueObject = literal(value);
+        return valueObject instanceof Double number ? number : null;
     }
 
-    private Double number(Expr value) {
-        Object literal = literal(value);
-        return literal instanceof Double ? (Double) literal : null;
-    }
-
-    private Object literal(Expr value) {
-        return value instanceof Expr.Literal ? ((Expr.Literal) value).value : null;
-    }
-
-    private boolean isPositiveWholeNumber(Expr value) {
-        Double number = number(value);
-        return number != null && isPositiveWholeNumber(number);
-    }
-
-    private boolean isPositiveWholeNumber(Double number) {
-        return Double.isFinite(number) && number > 0 && number == Math.floor(number);
+    private static boolean positiveWholeNumber(Token token) {
+        Double number = (Double) token.literal;
+        return Double.isFinite(number) && number >= 1
+            && number <= 1000 && number == Math.floor(number);
     }
 
     private void error(Token token, String message) {
-        valid = false;
         diagnostics.add(new Diagnostic(token.line, message));
     }
 }

@@ -14,22 +14,18 @@ public class GenerateAst {
             System.exit(64);
         }
         String outputDir = args[0];
-        defineNode(outputDir, "Program", "List<ConfigEntry> config, List<Stmt> main");
+        defineNode(outputDir, "Program", "List<ConfigEntry> config, List<Token> main");
         defineNode(outputDir, "Field", "Token name, Expr value");
 
         defineAst(outputDir, "ConfigEntry", Arrays.asList(
             "Setting : Token name, Expr value",
             "Instrument : Token name, List<Field> fields"
         ));
-        defineAst(outputDir, "Stmt", Arrays.asList(
-            "Assign : Token name, Expr value",
-            "Set : Token object, Token property, Expr value",
-            "Call : Token object, Token method, List<Expr> arguments"
-        ));
         defineAst(outputDir, "Expr", Arrays.asList(
             "Literal : Object value",
             "Ratio : Token numerator, Token denominator",
             "Note : Token note",
+            "Hit : Token keyword",
             "Rest : Token keyword",
             "ListLiteral : List<Expr> elements"
         ));
@@ -42,8 +38,10 @@ public class GenerateAst {
         try (PrintWriter writer = new PrintWriter(path, "UTF-8")) {
             writer.println("package io.github.marvinwiget.mucke.interpreter;");
             writer.println();
-            writer.println("import java.util.List;");
-            writer.println();
+            if (fieldList.contains("List<")) {
+                writer.println("import java.util.List;");
+                writer.println();
+            }
             writer.println("class " + className + " {");
             writeConstructor(writer, "    ", className, fieldList);
             writer.println();
