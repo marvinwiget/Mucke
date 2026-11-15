@@ -18,7 +18,9 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToolBar;
 import javafx.scene.layout.BorderPane;
@@ -40,6 +42,7 @@ public final class App extends Application {
     private CodeArea editor;
     private Label status;
     private Path file;
+    private boolean dirty;
 
     @Override
     public void start(Stage stage) {
@@ -55,7 +58,7 @@ public final class App extends Application {
         status = new Label("Checking...");
         status.setWrapText(true);
 
-        String initial = "config {\n}\n\nmain {\n}\n";
+        String initial = "config {\n\tbpm: 120\n\tmeter: 4/4\n\t\n}\n\nmain {\n\n}\n";
         boolean fileLoadFailed = false;
         if (!getParameters().getRaw().isEmpty()) {
             file = Path.of(getParameters().getRaw().get(0)).toAbsolutePath();
@@ -72,6 +75,7 @@ public final class App extends Application {
         debounce = new PauseTransition(Duration.millis(250));
         debounce.setOnFinished(event -> checkCurrentText());
         editor.textProperty().addListener((obs, oldText, newText) -> {
+            dirty = true;
             revision.incrementAndGet();
             status.setText("Checking...");
             debounce.playFromStart();
@@ -90,18 +94,22 @@ public final class App extends Application {
 
         stage.setTitle(file == null ? "Mucke" : "Mucke - " + file.getFileName());
         stage.setScene(new Scene(root, 1080, 720));
+        stage.setOnCloseRequest(event -> {
+            if (!canLeaveDocument(stage)) event.consume();
+        });
         stage.show();
         if (!fileLoadFailed) debounce.playFromStart();
     }
 
     private void openFile(Stage stage) {
         File selected = chooser().showOpenDialog(stage);
-        if (selected == null) return;
+        if (selected == null || !canLeaveDocument(stage)) return;
 
         try {
             String source = Files.readString(selected.toPath(), StandardCharsets.UTF_8);
             file = selected.toPath().toAbsolutePath();
             editor.replaceText(source);
+            dirty = false;
             revision.incrementAndGet();
             debounce.playFromStart();
             stage.setTitle("Mucke - " + file.getFileName());
@@ -110,22 +118,40 @@ public final class App extends Application {
         }
     }
 
-    private void saveFile(Stage stage) {
-        if (file == null) {
+    private boolean saveFile(Stage stage) {
+        Path target = file;
+        if (target == null) {
             File selected = chooser().showSaveDialog(stage);
-            if (selected == null) return;
-            file = selected.toPath().toAbsolutePath();
+            if (selected == null) return false;
+            target = selected.toPath().toAbsolutePath();
         }
 
         try {
-            Files.writeString(file, editor.getText(), StandardCharsets.UTF_8);
+            Files.writeString(target, editor.getText(), StandardCharsets.UTF_8);
+            file = target;
+            dirty = false;
             stage.setTitle("Mucke - " + file.getFileName());
             revision.incrementAndGet(); // Relative sample paths may have changed.
             debounce.playFromStart();
             status.setText("Saved " + file.getFileName());
+            return true;
         } catch (IOException error) {
             status.setText("Cannot save file: " + error.getMessage());
+            return false;
         }
+    }
+
+    private boolean canLeaveDocument(Stage stage) {
+        if (!dirty) return true;
+
+        ButtonType save = new ButtonType("Save");
+        ButtonType discard = new ButtonType("Discard");
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+            "Save your changes?", save, discard, ButtonType.CANCEL);
+
+        ButtonType choice = alert.showAndWait().orElse(ButtonType.CANCEL);
+        if (choice == save) return saveFile(stage);
+        return choice == discard;
     }
 
     private FileChooser chooser() {

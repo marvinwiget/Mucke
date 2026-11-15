@@ -15,11 +15,14 @@ final class BeatSequencer {
         List<PatternStep> pendingPattern;
         int nextStep;
         boolean synth;
+        int transpose;
+        int pendingTranspose;
 
-        Track(List<PatternStep> pattern, int nextStep, boolean synth) {
-            this.pattern = pattern;
+        Track(TrackPlan plan, int nextStep) {
+            this.pattern = plan.pattern;
             this.nextStep = nextStep;
-            this.synth = synth;
+            this.synth = plan.isSynth();
+            this.transpose = plan.transpose;
         }
     }
 
@@ -32,19 +35,21 @@ final class BeatSequencer {
         for (TrackPlan incoming : plan.tracks) {
             Track track = active.get(incoming.name);
             if (track == null) {
-                track = new Track(incoming.pattern,
-                    barStep % incoming.pattern.size(), incoming.isSynth());
+                track = new Track(incoming, barStep % incoming.pattern.size());
             } else if (track.synth != incoming.isSynth()) {
                 track.pattern = incoming.pattern;
                 track.pendingPattern = null;
                 track.nextStep = barStep % incoming.pattern.size();
                 track.synth = incoming.isSynth();
+                track.transpose = incoming.transpose;
             } else if (track.pattern.size() == incoming.pattern.size()
                     || track.nextStep == 0) {
                 track.pattern = incoming.pattern;
                 track.pendingPattern = null;
+                track.transpose = incoming.transpose;
             } else {
                 track.pendingPattern = incoming.pattern;
+                track.pendingTranspose = incoming.transpose;
             }
             next.put(incoming.name, track);
         }
@@ -59,10 +64,15 @@ final class BeatSequencer {
             if (track.pendingPattern != null && track.nextStep == 0) {
                 track.pattern = track.pendingPattern;
                 track.pendingPattern = null;
+                track.transpose = track.pendingTranspose;
             }
             steps.put(entry.getKey(), track.pattern.get(track.nextStep));
             track.nextStep = (track.nextStep + 1) % track.pattern.size();
         }
         return steps;
+    }
+
+    int transposeFor(String name) {
+        return active.get(name).transpose;
     }
 }

@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.sound.midi.MidiUnavailableException;
 
@@ -26,7 +27,7 @@ public final class LivePlayer implements AutoCloseable {
         }
     }
 
-    private final Map<Path, AudioClip> samples = new HashMap<>();
+    private final Map<Path, AudioClip> samples = new ConcurrentHashMap<>();
     private final SynthPlayer synth = new SynthPlayer();
     private final BeatSequencer sequencer = new BeatSequencer();
     private final PauseTransition clock = new PauseTransition();
@@ -83,7 +84,8 @@ public final class LivePlayer implements AutoCloseable {
         for (TrackPlan track : current.plan.tracks) {
             PatternStep step = steps.get(track.name);
             if (track.isSynth()) {
-                synth.play(channel++, track.synthProgram, track.transpose, step.notes);
+                synth.play(channel++, track.synthProgram,
+                    sequencer.transposeFor(track.name), step.notes);
             } else if (step.hit) {
                 current.clips.get(track.name).play();
             }
@@ -99,9 +101,7 @@ public final class LivePlayer implements AutoCloseable {
         closed = true;
         clock.stop();
         running = false;
-        if (current != null) {
-            current.clips.values().forEach(AudioClip::stop);
-        }
+        samples.values().forEach(AudioClip::stop);
         synth.close();
         current = null;
         pending = null;
