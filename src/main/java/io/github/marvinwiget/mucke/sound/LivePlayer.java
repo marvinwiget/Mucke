@@ -34,7 +34,6 @@ public final class LivePlayer implements AutoCloseable {
     private PreparedPlan current;
     private PreparedPlan pending;
     private long beat;
-    private boolean running;
     private boolean closed;
 
     public LivePlayer() {
@@ -65,8 +64,7 @@ public final class LivePlayer implements AutoCloseable {
     public void submit(PreparedPlan plan) {
         if (closed) return;
         pending = plan;
-        if (!running) {
-            running = true;
+        if (current == null) {
             tick();
         }
     }
@@ -100,7 +98,6 @@ public final class LivePlayer implements AutoCloseable {
     public void close() {
         closed = true;
         clock.stop();
-        running = false;
         samples.values().forEach(AudioClip::stop);
         synth.close();
         current = null;

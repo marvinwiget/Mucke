@@ -13,7 +13,7 @@ final class SynthPlayer implements AutoCloseable {
     private List<MidiChannel> channels = List.of();
     private List<List<Integer>> sounding = List.of();
     private volatile Synthesizer synth;
-    private volatile boolean closed;
+    private boolean closed;
 
     synchronized void prepare(int trackCount) throws MidiUnavailableException {
         if (trackCount == 0) return;
@@ -37,8 +37,6 @@ final class SynthPlayer implements AutoCloseable {
                 if (trackCount > available.size()) {
                     throw new MidiUnavailableException("Too many synth tracks.");
                 }
-                if (closed) throw new MidiUnavailableException("Synthesizer is closed.");
-
                 List<List<Integer>> active = new ArrayList<>();
                 for (int index = 0; index < available.size(); index++) {
                     active.add(new ArrayList<>());
