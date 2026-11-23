@@ -44,12 +44,14 @@ config {
     )
 }
 main {
-    $kick
-    $keys
+    1$kick
+    2$keys
 }
 ```
 
-`sample` tracks use `hit` and `rest`; the WAV plays unchanged. `synth` tracks use notes, chords, and `rest`; all notes in a chord start together and stop at the next beat. MIDI programs are numbered 0–127: `synth: 0` is piano and `synth: 80` is a square-wave lead. `transpose` shifts only synth notes by whole semitones. `[B3]` and `B3` both play one note.
+`sample` tracks use `hit` and `rest`; the WAV plays at its original pitch. `synth` tracks use notes, chords, and `rest`; all notes in a chord start together and stop at the next beat. MIDI programs are numbered 0–127: `synth: 0` is piano and `synth: 80` is a square-wave lead. `transpose` shifts only synth notes by whole semitones. `[B3]` and `B3` both play one note.
+
+In `main`, `1$kick` assigns an instrument to mixer slot 1. Slots 1–5 must be unique; `$kick` plays at full volume without a mixer slider. The right-hand sliders control assigned instruments and remember their levels during live edits. Removing a slot restores full volume; assigning it again restores its saved slider level. Synth level changes affect currently sounding notes; a WAV slider changes the volume of future hits while a sample already playing finishes at its previous level. The **Sample delay** slider shifts WAV hits later to line them up by ear with MIDI notes; its starting value uses half of the synthesizer's reported maximum latency.
 
 Each outer pattern entry lasts one beat: in `4/4`, one quarter note. A pattern loops at its own length, independently of the meter. `$kick` activates a track; remove that line to stop its future steps. A valid edit takes effect on the next beat once its sounds are ready. If you change a pattern's length, that track switches at its next cycle boundary. Invalid edits leave the last valid version playing. The JavaFX beat clock has approximate timing, and synth tracks need an available MIDI synthesizer and soundbank.
 

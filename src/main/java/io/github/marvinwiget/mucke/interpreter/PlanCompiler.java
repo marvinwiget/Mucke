@@ -44,10 +44,15 @@ final class PlanCompiler {
         }
 
         List<TrackPlan> tracks = new ArrayList<>();
-        for (Token name : program.main) {
-            tracks.add(instruments.get(name.lexeme));
+        Map<Integer, String> slots = new HashMap<>();
+        for (Activation activation : program.main) {
+            tracks.add(instruments.get(activation.name.lexeme));
+            if (activation.slot != null) {
+                int slot = ((Double) activation.slot.literal).intValue();
+                slots.put(slot, activation.name.lexeme);
+            }
         }
-        return new PlaybackPlan(bpm, meterTop, meterBottom, tracks);
+        return new PlaybackPlan(bpm, meterTop, meterBottom, tracks, slots);
     }
 
     private TrackPlan compileInstrument(ConfigEntry.Instrument instrument, Path baseDir) {

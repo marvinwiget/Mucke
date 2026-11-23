@@ -62,10 +62,24 @@ final class SynthPlayer implements AutoCloseable {
         }
     }
 
-    void play(int channelIndex, int program, int transpose, List<Integer> notes) {
+    long latencyMicros() {
+        return synth == null ? 0 : synth.getLatency();
+    }
+
+    void setVolume(int channelIndex, double volume) {
+        if (synth != null) {
+            MidiChannel channel = channels.get(channelIndex);
+            int value = (int) Math.round(volume * 127);
+            if (channel.getController(11) != value) channel.controlChange(11, value);
+        }
+    }
+
+    void play(int channelIndex, int program, int transpose,
+              double volume, List<Integer> notes) {
         if (notes.isEmpty()) return;
         MidiChannel channel = channels.get(channelIndex);
-        channel.programChange(program);
+        if (channel.getProgram() != program) channel.programChange(program);
+        setVolume(channelIndex, volume);
         for (int note : notes) {
             int actual = note + transpose;
             channel.noteOn(actual, 96);

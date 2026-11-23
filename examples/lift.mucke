@@ -1,0 +1,45 @@
+config {
+    bpm: 78
+    meter: 8/8
+
+    init guitar with (
+        synth: 27,
+        pattern: [
+            [B3, D#4, F#4], rest, [B3, D#4, F#4], rest,
+            [B3, D#4, F#4], rest, [B3, D#4, F#4], rest,
+            [A3, C#4, E4], rest, [A3, C#4, E4], rest,
+            [A3, C#4, E4], rest, [A3, C#4, E4], rest,
+            [G#3, B3, D#4], rest, [G#3, B3, D#4], rest,
+            [G#3, B3, D#4], rest, [G#3, B3, D#4], rest,
+            [E3, G#3, B3], rest, [E3, G#3, B3], rest,
+            [E3, G#3, B3], rest, [E3, G#3, B3], rest
+        ]
+    )
+
+    init bass with (
+        synth: 33,
+        pattern: [
+            B2, rest, rest, rest, F#2, rest, rest, rest,
+            A2, rest, rest, rest, E2, rest, rest, rest,
+            G#2, rest, rest, rest, D#2, rest, rest, rest,
+            E2, rest, rest, rest, B2, rest, rest, rest
+        ]
+    )
+
+    init kick with (
+        sample: "../samples/drums/kick/elec_soft_kick.wav",
+        pattern: [hit, rest, rest, rest, hit, rest, rest, rest]
+    )
+
+    init snare with (
+        sample: "../samples/drums/snare/drum_snare_soft.wav",
+        pattern: [rest, rest, hit, rest, rest, rest, hit, rest]
+    )
+}
+
+main {
+    1$guitar
+    2$bass
+    3$kick
+    4$snare
+}

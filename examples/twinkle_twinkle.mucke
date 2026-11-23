@@ -1,0 +1,21 @@
+config {
+    bpm: 108
+    meter: 4/4
+
+    init melody with (
+        synth: 10,
+        pattern: [
+            C4, C4, G4, G4, A4, A4, G4, G4,
+            F4, F4, E4, E4, D4, D4, C4, C4,
+            G4, G4, F4, F4, E4, E4, D4, D4,
+            G4, G4, F4, F4, E4, E4, D4, D4,
+            C4, C4, G4, G4, A4, A4, G4, G4,
+            F4, F4, E4, E4, D4, D4, C4, C4
+        ]
+    )
+
+}
+
+main {
+    1$melody
+}

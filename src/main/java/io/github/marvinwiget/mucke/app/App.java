@@ -40,6 +40,7 @@ public final class App extends Application {
     private ExecutorService worker;
     private PauseTransition debounce;
     private CodeArea editor;
+    private MixerPanel mixer;
     private Label status;
     private Path file;
     private boolean dirty;
@@ -55,6 +56,8 @@ public final class App extends Application {
         editor = new CodeArea();
         editor.setParagraphGraphicFactory(LineNumberFactory.get(editor));
         editor.setWrapText(false);
+        mixer = new MixerPanel(player);
+        player.setPlanListener(mixer::showPlan);
         status = new Label("Checking...");
         status.setWrapText(true);
 
@@ -90,11 +93,14 @@ public final class App extends Application {
         BorderPane root = new BorderPane();
         root.setTop(new ToolBar(open, save));
         root.setCenter(new VirtualizedScrollPane<>(editor));
+        root.setRight(mixer);
         root.setBottom(status);
         BorderPane.setMargin(status, new Insets(8));
 
         stage.setTitle(file == null ? "Mucke" : "Mucke - " + file.getFileName());
-        stage.setScene(new Scene(root, 1080, 720));
+        Scene scene = new Scene(root, 1080, 720);
+        scene.getStylesheets().add(getClass().getResource("app.css").toExternalForm());
+        stage.setScene(scene);
         stage.setOnCloseRequest(event -> {
             if (!canLeaveDocument(stage)) event.consume();
         });

@@ -1,0 +1,29 @@
+config {
+    bpm: 129
+    meter: 8/8
+
+    init guitar with (
+        synth: 25,
+        pattern: [
+            A3, C#4, E4, A4, E4, C#4, B3, rest,
+            A3, C#4, E4, A4, E4, C#4, B3, rest,
+            D3, A3, D4, F#4, A4, F#4, D4, rest,
+            E3, B3, E4, G#4, B4, G#4, E4, rest
+        ]
+    )
+
+    init bass with (
+        synth: 32,
+        pattern: [
+            A2, rest, rest, rest, E3, rest, rest, rest,
+            A2, rest, rest, rest, E3, rest, rest, rest,
+            D2, rest, rest, rest, A2, rest, rest, rest,
+            E2, rest, rest, rest, B2, rest, rest, rest
+        ]
+    )
+}
+
+main {
+    1$guitar
+    2$bass
+}

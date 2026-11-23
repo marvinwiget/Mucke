@@ -32,11 +32,21 @@ class Validator {
         }
 
         Set<String> active = new HashSet<>();
-        for (Token name : program.main) {
+        Set<Integer> slots = new HashSet<>();
+        for (Activation activation : program.main) {
+            Token name = activation.name;
             if (!instruments.contains(name.lexeme)) {
                 error(name, "Unknown instrument '" + name.lexeme + "'.");
             } else if (!active.add(name.lexeme)) {
                 error(name, "Instrument '" + name.lexeme + "' is already active.");
+            }
+            if (activation.slot != null) {
+                Double number = (Double) activation.slot.literal;
+                if (!wholeNumber(number, 1, 5)) {
+                    error(activation.slot, "Slot must be a whole number from 1 to 5.");
+                } else if (!slots.add(number.intValue())) {
+                    error(activation.slot, "Slot " + number.intValue() + " is already assigned.");
+                }
             }
         }
 

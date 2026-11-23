@@ -1,0 +1,21 @@
+.mucke-sidebar {
+    -fx-background-color: #f4f4f4;
+    -fx-border-color: #d9d9d9;
+    -fx-border-width: 0 0 0 1;
+}
+
+.mixer-heading {
+    -fx-text-fill: #555555;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.mixer-slot, .mixer-value {
+    -fx-text-fill: #666666;
+    -fx-font-size: 12px;
+}
+
+.mixer-name {
+    -fx-text-fill: #222222;
+    -fx-font-size: 13px;
+}

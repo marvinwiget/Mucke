@@ -20,7 +20,7 @@ class Parser {
   }
 
   // program → "config" "{" configEntry* "}"
-  //           "main"   "{" ("$" IDENTIFIER NEWLINE)* "}" EOF
+  //           "main"   "{" ((NUMBER)? "$" IDENTIFIER NEWLINE)* "}" EOF
   Program parse() {
     try {
       skipNewlines();
@@ -34,7 +34,7 @@ class Parser {
 
       consume(MAIN, "Expect 'main'.");
       consume(LEFT_BRACE, "Expect '{' after 'main'.");
-      List<Token> main = mainBlock();
+      List<Activation> main = mainBlock();
       consume(RIGHT_BRACE, "Expect '}' after main block.");
 
       skipNewlines();
@@ -102,14 +102,16 @@ class Parser {
     return new ConfigEntry.Instrument(name, fields);
   }
 
-  // main block → ("$" IDENTIFIER NEWLINE)*
-  private List<Token> mainBlock() {
-    List<Token> instruments = new ArrayList<>();
+  // main block → (NUMBER? "$" IDENTIFIER NEWLINE)*
+  private List<Activation> mainBlock() {
+    List<Activation> instruments = new ArrayList<>();
     skipNewlines();
 
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
+      Token slot = match(NUMBER) ? previous() : null;
       consume(DOLLAR, "Expect '$' before an instrument name.");
-      instruments.add(consume(IDENTIFIER, "Expect instrument name after '$'."));
+      Token name = consume(IDENTIFIER, "Expect instrument name after '$'.");
+      instruments.add(new Activation(name, slot));
       endOfLine();
     }
 

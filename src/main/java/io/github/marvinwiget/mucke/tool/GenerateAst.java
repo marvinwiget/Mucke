@@ -14,7 +14,8 @@ public class GenerateAst {
             System.exit(64);
         }
         String outputDir = args[0];
-        defineNode(outputDir, "Program", "List<ConfigEntry> config, List<Token> main");
+        defineNode(outputDir, "Program", "List<ConfigEntry> config, List<Activation> main");
+        defineNode(outputDir, "Activation", "Token name, Token slot");
         defineNode(outputDir, "Field", "Token name, Expr value");
 
         defineAst(outputDir, "ConfigEntry", Arrays.asList(
