@@ -71,6 +71,7 @@ public final class App extends Application {
             }
         }
         editor.replaceText(initial);
+        editor.getUndoManager().forgetHistory();
 
         debounce = new PauseTransition(Duration.millis(250));
         debounce.setOnFinished(event -> checkCurrentText());
@@ -109,6 +110,7 @@ public final class App extends Application {
             String source = Files.readString(selected.toPath(), StandardCharsets.UTF_8);
             file = selected.toPath().toAbsolutePath();
             editor.replaceText(source);
+            editor.getUndoManager().forgetHistory();
             dirty = false;
             revision.incrementAndGet();
             debounce.playFromStart();

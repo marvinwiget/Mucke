@@ -10,6 +10,7 @@ class Parser {
 
   private final List<Token> tokens;
   private int current = 0;
+  private int listDepth = 0;
 
   private final List<Diagnostic> diagnostics;
 
@@ -146,7 +147,15 @@ class Parser {
     }
 
     if (match(LEFT_BRACKET)) {
-      return list();
+      if (listDepth == 2) {
+        throw error(previous(), "Lists can only be nested once.");
+      }
+      listDepth++;
+      try {
+        return list();
+      } finally {
+        listDepth--;
+      }
     }
 
     throw error(peek(), "Expect a value.");
